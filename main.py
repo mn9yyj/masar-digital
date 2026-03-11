@@ -1,134 +1,109 @@
 import streamlit as st
 import requests, json, os, io
 from pptx import Presentation
-from pptx.util import Pt
+from pptx.util import Pt, Inches
 from pptx.enum.text import PP_ALIGN
+from pptx.dml.color import RGBColor
 
-# --- 1. التصميم البصري ---
-st.set_page_config(page_title="المسار 🖥️ الرقمي", layout="wide")
+# --- 1. واجهة مستخدم متطورة ---
+st.set_page_config(page_title="المسار 🖥️ الرقمي - المصمم الذكي", layout="wide")
 
 st.markdown("""
     <style>
     [data-testid="stSidebar"], footer, header {display: none !important;}
-    .stApp { background: #050505; direction: rtl; }
-    .brand { font-size: 42px; font-weight: 900; text-align: center; color: #706fd3; margin-bottom: 20px; }
-    .centered-ui { max-width: 600px; margin: 0 auto; }
-
-    /* تنسيق المربعات البارزة للايقونات */
-    div[data-baseweb="segmented-control"] { 
-        background: rgba(255, 255, 255, 0.05) !important; 
-        border-radius: 10px; padding: 5px;
-        border: 1px solid rgba(112, 111, 211, 0.2);
-    }
-
-    .stButton>button { 
-        width: 100%; border-radius: 12px !important; 
-        background: linear-gradient(90deg, #4834d4, #686de0) !important; 
-        height: 55px; font-weight: bold; font-size: 18px; border: none !important;
-    }
+    .stApp { background: #0a0a0a; color: white; direction: rtl; }
+    .brand { font-size: 45px; font-weight: 900; text-align: center; background: linear-gradient(45deg, #706fd3, #4834d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 30px; }
+    .stButton>button { width: 100%; border-radius: 15px !important; background: linear-gradient(90deg, #4834d4, #686de0) !important; color: white; font-weight: bold; border: none; transition: 0.3s; }
+    .stButton>button:hover { transform: scale(1.02); }
     </style>
     """, unsafe_allow_html=True)
 
-st.markdown('<div class="brand">المسار 🖥️ الرقمي</div>', unsafe_allow_html=True)
+st.markdown('<div class="brand">المسار 🖥️ الرقمي | المصمم الذكي</div>', unsafe_allow_html=True)
 
-# --- 2. واجهة المستخدم (تلقائي/يدوي) ---
-with st.container():
-    st.markdown('<div class="centered-ui">', unsafe_allow_html=True)
+# --- 2. محرك التنسيق اللوني حسب الموضوع ---
+def get_theme_colors(topic):
+    topic = topic.lower()
+    # تقني / تكنولوجي
+    if any(word in topic for word in ['تقني', 'برمج', 'حاسب', 'tech', 'ai', 'software']):
+        return RGBColor(0, 168, 255), RGBColor(30, 39, 46) # أزرق تقني
+    # طبي / صحي
+    elif any(word in topic for word in ['طب', 'صحي', 'مرض', 'health', 'medical']):
+        return RGBColor(46, 204, 113), RGBColor(255, 255, 255) # أخضر طبي
+    # تجاري / إداري
+    elif any(word in topic for word in ['إدار', 'بزنس', 'مال', 'business', 'money']):
+        return RGBColor(44, 62, 80), RGBColor(236, 240, 241) # كحلي رسمي
+    # عام
+    else:
+        return RGBColor(112, 111, 211), RGBColor(255, 255, 255) # بنفسجي المسار الرقمي
 
-    mode = st.segmented_control("الوضع الحالي", options=["تلقائي ✨", "يدوي ✍️"], default="تلقائي ✨")
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    topic = st.text_input("🎯 موضوع العرض الرئيسي", placeholder="اكتب عنوان الموضوع هنا...")
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.write("🔢 عدد الشرائح")
-        slides_num = st.segmented_control("S_Num", options=[3, 5, 10, 15, 20, 30], default=5, label_visibility="collapsed")
-    with col2:
-        st.write("📝 عمق المحتوى")
-        depth = st.segmented_control("D_Val", options=["مختصر", "تفصيلي"], default="مختصر", label_visibility="collapsed")
-
-    # منطق الخانات اليدوية
-    manual_titles = []
-    if mode == "يدوي ✍️":
-        st.markdown("<hr style='opacity:0.1'>", unsafe_allow_html=True)
-        for i in range(slides_num):
-            t_input = st.text_input(f"عنوان الشريحة {i+1}", key=f"manual_t_{i}")
-            manual_titles.append(t_input)
-
-    c1, c2 = st.columns(2)
-    with c1:
-        lang = st.selectbox("🌐 اللغة", ["العربية", "English", "مزدوج (Ar/En)"])
-    with c2:
-        style = st.selectbox("🎨 الأسلوب", ["احترافي", "عادي", "تعليمي"])
-
-    generate_btn = st.button("🚀 صنع العرض الآن")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# --- 3. وظيفة إنشاء ملف البوربوينت (المصلحة) ---
-def build_pptx(data, language):
-    prs = Presentation()
-    for item in data:
-        slide = prs.slides.add_slide(prs.slide_layouts[1])
-
-        # استخراج النصوص ومعالجة خطأ القواميس (AttributeError fix)
-        # نضمن هنا أن يكون الناتج دوماً نص (String) وليس قاموساً
-        t_raw = item.get('title', '')
-        b_raw = item.get('body', '')
-
-        t_text = str(t_raw) if not isinstance(t_raw, dict) else " / ".join(filter(None, t_raw.values()))
-        b_text = str(b_raw) if not isinstance(b_raw, dict) else "\n".join(filter(None, b_raw.values()))
-
-        # إعداد العنوان (حجم 24)
-        title_shape = slide.shapes.title
-        title_shape.text = t_text
-        title_shape.text_frame.paragraphs[0].font.size = Pt(24)
-
-        # إعداد المحتوى (حجم 14 لضمان المساحة)
-        body_shape = slide.placeholders[1]
-        body_shape.text = b_text
-        for p in body_shape.text_frame.paragraphs:
-            p.font.size = Pt(14)
-            # ضبط الاتجاه حسب اللغة
-            p.alignment = PP_ALIGN.RIGHT if "العربية" in language or "مزدوج" in language else PP_ALIGN.LEFT
-
-    output_stream = io.BytesIO()
-    prs.save(output_stream)
-    return output_stream.getvalue()
-
-# --- 4. منطق التشغيل والتحميل ---
-if generate_btn and topic:
-    with st.spinner('جاري توليد المحتوى وتنسيق البوربوينت...'):
-        api_key = os.environ.get('OPENROUTER_API_KEY')
-
-        # بناء الطلب حسب الوضع (تلقائي أو يدوي)
-        if mode == "يدوي ✍️" and any(manual_titles):
-            titles_list = ", ".join([t for t in manual_titles if t])
-            prompt = f"Create {slides_num} slides for '{topic}' using these specific titles: {titles_list}. Write in {lang}. Return ONLY JSON array of {{'title': '...', 'body': '...'}}."
-        else:
-            prompt = f"Create {slides_num} professional slides about '{topic}'. Language: {lang}. Style: {style}. Depth: {depth}. Return ONLY JSON array of {{'title': '...', 'body': '...'}}."
-
-        try:
-            res = requests.post("https://openrouter.ai/api/v1/chat/completions",
-                                headers={"Authorization": f"Bearer {api_key}"},
-                                json={"model": "google/gemini-2.0-flash-001", "messages": [{"role": "user", "content": prompt}]})
-
-            content = res.json()['choices'][0]['message']['content'].replace("```json", "").replace("```", "").strip()
-            data_json = json.loads(content)
-
-            # تخزين الملف في الجلسة لضمان عمل زر التحميل
-            st.session_state['file_ready'] = build_pptx(data_json, lang)
-            st.session_state['current_topic'] = topic
-        except Exception as e:
-            st.error(f"خطأ في المعالجة: {str(e)}")
-
-if 'file_ready' in st.session_state:
-    st.markdown('<div class="centered-ui">', unsafe_allow_html=True)
-    st.success(f"✅ تم إنشاء عرض: {st.session_state['current_topic']}")
-    st.download_button(
-        label="📥 تحميل ملف البوربوينت النهائي",
-        data=st.session_state['file_ready'],
-        file_name=f"{st.session_state['current_topic']}.pptx",
-        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+# --- 3. جلب المحتوى العميق ---
+def get_pro_content(topic, count, lang):
+    api_key = st.secrets.get("OPENROUTER_API_KEY") or os.environ.get("OPENROUTER_API_KEY")
+    prompt = (
+        f"Act as an expert consultant. Create {count} professional slides about '{topic}'. "
+        f"Each slide MUST have a very detailed, factual, and analytical body (min 200 words). "
+        f"Language: {lang}. Style: Academic and Deep. "
+        "Return ONLY JSON: [{'title': '...', 'body': '...'}]"
     )
+    try:
+        res = requests.post("https://openrouter.ai/api/v1/chat/completions",
+                            headers={"Authorization": f"Bearer {api_key}"},
+                            json={"model": "google/gemini-2.0-flash-001", "messages": [{"role": "user", "content": prompt}]})
+        data = res.json()
+        if 'choices' not in data: return None
+        return json.loads(data['choices'][0]['message']['content'].replace("```json", "").replace("```", "").strip())
+    except: return None
+
+# --- 4. واجهة المدخلات ---
+with st.container():
+    col_main = st.columns([1, 2, 1])[1]
+    with col_main:
+        topic = st.text_input("💎 موضوع العرض (سيتم تصميم الثيم بناءً عليه)", placeholder="مثلاً: مستقبل الذكاء الاصطناعي في الطب")
+        slides_num = st.slider("عدد الشرائح", 3, 15, 5)
+        lang = st.selectbox("🌐 لغة المحتوى", ["العربية", "English", "مزدوج"])
+        generate_btn = st.button("🎨 توليد وتصميم العرض الاحترافي")
+
+# --- 5. محرك التصميم المعتمد على الموضوع ---
+if generate_btn and topic:
+    with st.spinner('🎨 المحرك الذكي يحلل الموضوع ويصمم الشرائح...'):
+        content_data = get_pro_content(topic, slides_num, lang)
+        if content_data:
+            prs = Presentation()
+            primary_color, bg_color = get_theme_colors(topic)
+            
+            for item in content_data:
+                slide = prs.slides.add_slide(prs.slide_layouts[1])
+                
+                # تنسيق العنوان
+                title_shape = slide.shapes.title
+                title_shape.text = str(item['title'])
+                title_paragraph = title_shape.text_frame.paragraphs[0]
+                title_paragraph.font.size = Pt(26)
+                title_paragraph.font.bold = True
+                title_paragraph.font.color.rgb = primary_color
+                
+                # تنسيق المحتوى الكثيف
+                body_shape = slide.placeholders[1]
+                body_shape.text = str(item['body'])
+                for p in body_shape.text_frame.paragraphs:
+                    p.font.size = Pt(11) # خط صغير للمعلومات الكثيرة
+                    p.font.name = "Arial"
+                    p.alignment = PP_ALIGN.RIGHT if lang != "English" else PP_ALIGN.LEFT
+                    p.space_after = Pt(10)
+
+                # إضافة لمسة تصميمية (خط سفلي بلون الثيم)
+                line = slide.shapes.add_connector(1, Inches(0.5), Inches(1.2), Inches(9.5), Inches(1.2))
+                line.line.color.rgb = primary_color
+
+            buf = io.BytesIO()
+            prs.save(buf)
+            st.session_state['pro_file'] = buf.getvalue()
+            st.session_state['pro_name'] = topic
+
+if 'pro_file' in st.session_state:
+    st.markdown('<div style="text-align:center">', unsafe_allow_html=True)
+    st.success(f"✨ تم تصميم عرض '{st.session_state['pro_name']}' بنجاح!")
+    st.download_button("📥 تحميل العرض المصمم ذكياً", 
+                       data=st.session_state['pro_file'], 
+                       file_name=f"{st.session_state['pro_name']}.pptx")
     st.markdown('</div>', unsafe_allow_html=True)
