@@ -1,117 +1,299 @@
 import streamlit as st
-import requests, json, os, io, random
+import requests, json, io
 from pptx import Presentation
 from pptx.util import Pt, Inches
 from pptx.enum.text import PP_ALIGN
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE
 
-# --- 1. واجهة المستخدم بنمط Dark Mode الاحترافي ---
-st.set_page_config(page_title="المسار 🖥️ الرقمي - نسخة الإنفوجرافيك", layout="wide")
+
+# ---------------------------
+# واجهة التطبيق
+# ---------------------------
+st.set_page_config(page_title="المسار الرقمي", layout="wide")
+
 st.markdown("""
-    <style>
-    [data-testid="stSidebar"], footer, header {display: none !important;}
-    .stApp { background: #0e0e0e; direction: rtl; }
-    .brand { font-size: 35px; font-weight: 900; text-align: center; color: #00d2ff; margin: 20px 0; }
-    .stButton>button { width: 100%; border-radius: 20px !important; background: linear-gradient(90deg, #00d2ff, #3a7bd5) !important; height: 50px; font-weight: bold; border: none !important; }
-    .stInput>div>div>input { background-color: #1a1a1a !important; color: white !important; border-radius: 10px !important; }
-    </style>
-    """, unsafe_allow_html=True)
+<style>
+.stApp {background:#0e0e0e;direction:rtl}
+.brand{
+font-size:35px;
+font-weight:900;
+text-align:center;
+color:#00d2ff;
+margin:20px
+}
+.stButton>button{
+width:100%;
+border-radius:20px;
+height:50px;
+font-weight:bold;
+background:linear-gradient(90deg,#00d2ff,#3a7bd5);
+border:none
+}
+</style>
+""", unsafe_allow_html=True)
 
-st.markdown('<div class="brand">المسار 🖥️ الرقمي - Premium Layouts</div>', unsafe_allow_html=True)
+st.markdown('<div class="brand">المسار الرقمي 🖥️ مولد العروض</div>', unsafe_allow_html=True)
 
-# --- 2. محرك التصميم وتوزيع النصوص ---
-def apply_pro_layout(slide, item, index, lang_choice):
-    # مصفوفة ألوان متناغمة
-    palette = [RGBColor(0, 210, 255), RGBColor(255, 107, 107), RGBColor(29, 209, 161), RGBColor(254, 202, 87)]
+
+# ---------------------------
+# محرك تصميم الشرائح
+# ---------------------------
+def apply_pro_layout(slide, item, index):
+
+    palette = [
+        RGBColor(255,193,7),
+        RGBColor(255,87,34),
+        RGBColor(0,188,212),
+        RGBColor(63,81,181)
+    ]
+
     color = palette[index % len(palette)]
-    
-    # تحديد نمط الشريحة (يتغير كل مرة)
-    style = index % 3
+    style = index % 5
 
-    # أ) إضافة لمسات هندسية خلفية (تجنب خطأ TRIANGLE)
+
+    # ----------------
+    # شريحة الغلاف
+    # ----------------
     if style == 0:
-        shape = slide.shapes.add_shape(MSO_SHAPE.OVAL, Inches(-0.5), Inches(-0.5), Inches(3), Inches(3))
+
+        shape = slide.shapes.add_shape(
+            MSO_SHAPE.ROUNDED_RECTANGLE,
+            Inches(2.5), Inches(2),
+            Inches(5), Inches(1.5)
+        )
+
+        shape.fill.solid()
+        shape.fill.fore_color.rgb = color
+        shape.line.width = 0
+
+        tf = shape.text_frame
+        p = tf.paragraphs[0]
+
+        p.text = item.get("title","العنوان الرئيسي")
+        p.font.size = Pt(36)
+        p.font.bold = True
+        p.alignment = PP_ALIGN.CENTER
+
+
+
+    # ----------------
+    # نقاط مرقمة
+    # ----------------
     elif style == 1:
-        shape = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, Inches(10), Inches(0.7))
+
+        title = slide.shapes.add_textbox(
+            Inches(1), Inches(0.3),
+            Inches(8), Inches(1)
+        )
+
+        p = title.text_frame.paragraphs[0]
+        p.text = item.get("title","العنوان")
+        p.font.size = Pt(28)
+        p.font.bold = True
+        p.alignment = PP_ALIGN.CENTER
+
+        points = item.get("points",[])
+
+        for i,pt in enumerate(points[:4]):
+
+            top = Inches(1.5 + i*1.2)
+
+            circle = slide.shapes.add_shape(
+                MSO_SHAPE.OVAL,
+                Inches(0.8), top,
+                Inches(0.5), Inches(0.5)
+            )
+
+            circle.fill.solid()
+            circle.fill.fore_color.rgb = color
+
+            num = slide.shapes.add_textbox(
+                Inches(0.9), top,
+                Inches(0.5), Inches(0.5)
+            )
+
+            num_tf = num.text_frame.paragraphs[0]
+            num_tf.text = str(i+1)
+            num_tf.font.size = Pt(14)
+            num_tf.font.color.rgb = RGBColor(255,255,255)
+
+            text = slide.shapes.add_textbox(
+                Inches(1.5), top,
+                Inches(8), Inches(1)
+            )
+
+            p = text.text_frame.paragraphs[0]
+            p.text = str(pt)
+            p.font.size = Pt(16)
+
+
+
+    # ----------------
+    # أعمدة
+    # ----------------
+    elif style == 2:
+
+        title = slide.shapes.add_textbox(
+            Inches(1), Inches(0.3),
+            Inches(8), Inches(1)
+        )
+
+        p = title.text_frame.paragraphs[0]
+        p.text = item.get("title","العنوان")
+        p.font.size = Pt(28)
+        p.font.bold = True
+        p.alignment = PP_ALIGN.CENTER
+
+        points = item.get("points",[])
+
+        for i,pt in enumerate(points[:3]):
+
+            box = slide.shapes.add_shape(
+                MSO_SHAPE.ROUNDED_RECTANGLE,
+                Inches(1 + i*3),
+                Inches(2),
+                Inches(2.5),
+                Inches(2)
+            )
+
+            box.fill.solid()
+            box.fill.fore_color.rgb = color
+
+            tf = box.text_frame.paragraphs[0]
+
+            tf.text = str(pt)
+            tf.font.size = Pt(14)
+            tf.font.color.rgb = RGBColor(255,255,255)
+            tf.alignment = PP_ALIGN.CENTER
+
+
+
+    # ----------------
+    # نص + شكل
+    # ----------------
+    elif style == 3:
+
+        title = slide.shapes.add_textbox(
+            Inches(1), Inches(0.3),
+            Inches(8), Inches(1)
+        )
+
+        p = title.text_frame.paragraphs[0]
+        p.text = item.get("title","العنوان")
+        p.font.size = Pt(26)
+        p.font.bold = True
+
+        rect = slide.shapes.add_shape(
+            MSO_SHAPE.RECTANGLE,
+            Inches(6),
+            Inches(2),
+            Inches(3),
+            Inches(2)
+        )
+
+        rect.fill.solid()
+        rect.fill.fore_color.rgb = color
+
+        text = slide.shapes.add_textbox(
+            Inches(1),
+            Inches(2),
+            Inches(4.5),
+            Inches(2)
+        )
+
+        p = text.text_frame.paragraphs[0]
+        p.text = "\n".join(item.get("points",[]))
+        p.font.size = Pt(16)
+
+
+
+    # ----------------
+    # الخاتمة
+    # ----------------
     else:
-        shape = slide.shapes.add_shape(MSO_SHAPE.HEXAGON, Inches(8.8), Inches(0.2), Inches(1), Inches(1))
-    
-    shape.fill.solid()
-    shape.fill.fore_color.rgb = color
-    shape.line.width = 0
 
-    # ب) معالجة العنوان (تنظيف النصوص من JSON)
-    title_text = item.get('title', 'العنوان')
-    if isinstance(title_text, dict): title_text = title_text.get('ar', title_text.get('en', ''))
-    
-    title_box = slide.shapes.add_textbox(Inches(1), Inches(0.2), Inches(8), Inches(1))
-    p_title = title_box.text_frame.paragraphs[0]
-    p_title.text = str(title_text)
-    p_title.font.size, p_title.font.bold = Pt(26), True
-    p_title.alignment = PP_ALIGN.CENTER
+        circle = slide.shapes.add_shape(
+            MSO_SHAPE.OVAL,
+            Inches(4),
+            Inches(1.5),
+            Inches(2),
+            Inches(2)
+        )
 
-    # ج) توزيع النقاط مع الترقيم الاحترافي
-    points = item.get('points', [])
-    for i, pt_data in enumerate(points[:4]):
-        top_pos = Inches(1.6 + (i * 1.3))
-        
-        # رسم دائرة الرقم
-        circle = slide.shapes.add_shape(MSO_SHAPE.OVAL, Inches(0.5), top_pos + Inches(0.1), Inches(0.4), Inches(0.4))
         circle.fill.solid()
         circle.fill.fore_color.rgb = color
-        
-        # إضافة الرقم
-        num_frame = slide.shapes.add_textbox(Inches(0.52), top_pos + Inches(0.05), Inches(0.4), Inches(0.4))
-        p_num = num_frame.text_frame.paragraphs[0]
-        p_num.text = str(i + 1)
-        p_num.font.size, p_num.font.color.rgb = Pt(14), RGBColor(255, 255, 255)
 
-        # إضافة النص المرتب
-        content_box = slide.shapes.add_textbox(Inches(1.1), top_pos, Inches(8.5), Inches(1))
-        tf = content_box.text_frame
-        tf.word_wrap = True
-        p = tf.paragraphs[0]
-        
-        if lang_choice == "مزدوج" and isinstance(pt_data, dict):
-            p.text = f"{pt_data.get('ar', '')}\n{pt_data.get('en', '')}"
-            p.font.size = Pt(11)
-        else:
-            p.text = str(pt_data)
-            p.font.size = Pt(13)
-        
-        p.alignment = PP_ALIGN.RIGHT if lang_choice != "English" else PP_ALIGN.LEFT
+        tf = circle.text_frame.paragraphs[0]
 
-# --- 3. تشغيل التطبيق ---
-with st.container():
-    topic = st.text_input("🎯 موضوع العرض", placeholder="أدخل موضوعك هنا...")
-    count = st.select_slider("عدد الشرائح", options=[3, 5, 10], value=5)
-    lang = st.selectbox("🌐 اللغة", ["العربية", "English", "مزدوج"])
+        tf.text = "الخاتمة"
+        tf.font.size = Pt(24)
+        tf.font.bold = True
+        tf.font.color.rgb = RGBColor(255,255,255)
+        tf.alignment = PP_ALIGN.CENTER
 
-    if st.button("🚀 صنع العرض الاحترافي المطور"):
-        api_key = st.secrets.get("OPENROUTER_API_KEY")
-        if not api_key: st.error("يرجى التأكد من مفتاح الـ API!")
-        else:
-            with st.spinner('🎨 جاري تنسيق الإنفوجرافيك وتوزيع النقاط...'):
-                try:
-                    p_fmt = "{'ar': 'نص عربي مختصر', 'en': 'Short English'}" if lang == "مزدوج" else "'نص النقطة'"
-                    prompt = f"Create {count} slides about '{topic}'. Return ONLY JSON: [{{'title': '...', 'points': [{p_fmt}, {p_fmt}, {p_fmt}, {p_fmt}]}}]"
-                    
-                    res = requests.post("https://openrouter.ai/api/v1/chat/completions",
-                                        headers={"Authorization": f"Bearer {api_key}"},
-                                        json={"model": "google/gemini-2.0-flash-001", "messages": [{"role": "user", "content": prompt}]})
-                    
-                    data = json.loads(res.json()['choices'][0]['message']['content'].strip('`json \n'))
-                    prs = Presentation()
-                    for i, s_data in enumerate(data):
-                        slide = prs.slides.add_slide(prs.slide_layouts[6])
-                        apply_pro_layout(slide, s_data, i, lang)
-                    
-                    buf = io.BytesIO()
-                    prs.save(buf)
-                    st.session_state['file'] = buf.getvalue()
-                except Exception as e: st.error(f"حدث خطأ في البيانات: {e}")
 
-if 'file' in st.session_state:
-    st.success("✅ تم بناء العرض بنجاح!")
-    st.download_button("📥 تحميل الإنفوجرافيك المرقم", data=st.session_state['file'], file_name="Digital_Path_Final.pptx")
+# ---------------------------
+# واجهة الإدخال
+# ---------------------------
+topic = st.text_input("موضوع العرض")
+
+count = st.select_slider(
+"عدد الشرائح",
+options=[3,5,10],
+value=5
+)
+
+
+# ---------------------------
+# إنشاء العرض
+# ---------------------------
+if st.button("إنشاء العرض"):
+
+    api_key = st.secrets.get("OPENROUTER_API_KEY")
+
+    prompt = f"""
+Create {count} slides about {topic}.
+Return JSON only like:
+[
+{{"title":"title","points":["p1","p2","p3","p4"]}}
+]
+"""
+
+    res = requests.post(
+        "https://openrouter.ai/api/v1/chat/completions",
+        headers={"Authorization": f"Bearer {api_key}"},
+        json={
+            "model":"google/gemini-2.0-flash-001",
+            "messages":[{"role":"user","content":prompt}]
+        }
+    )
+
+    data = json.loads(
+        res.json()["choices"][0]["message"]["content"]
+        .strip("`json")
+    )
+
+    prs = Presentation()
+
+    for i,slide_data in enumerate(data):
+
+        slide = prs.slides.add_slide(
+            prs.slide_layouts[6]
+        )
+
+        apply_pro_layout(
+            slide,
+            slide_data,
+            i
+        )
+
+    buf = io.BytesIO()
+
+    prs.save(buf)
+
+    st.download_button(
+        "تحميل العرض",
+        data=buf.getvalue(),
+        file_name="presentation.pptx"
+    )
