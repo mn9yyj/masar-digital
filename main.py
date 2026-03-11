@@ -6,8 +6,8 @@ from pptx.enum.text import PP_ALIGN
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE
 
-# --- 1. واجهة المستخدم (التصميم الثابت) ---
-st.set_page_config(page_title="المسار 🖥️ الرقمي", layout="wide")
+# --- 1. تصميم واجهة الموقع ---
+st.set_page_config(page_title="المسار 🖥️ الرقمي - المطور", layout="wide")
 st.markdown("""
     <style>
     [data-testid="stSidebar"], footer, header {display: none !important;}
@@ -18,71 +18,65 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.markdown('<div class="brand">المسار 🖥️ الرقمي - Pro</div>', unsafe_allow_html=True)
+st.markdown('<div class="brand">المسار 🖥️ الرقمي</div>', unsafe_allow_html=True)
 
-# --- 2. محرك التصميم العالمي ---
-def apply_pro_theme(slide, topic, title_text, body_text, lang_choice):
-    # تحديد الهوية اللونية
-    topic_l = topic.lower()
-    main_color = RGBColor(112, 111, 211) # بنفسجي افتراضي
-    if any(w in topic_l for w in ['رمضان', 'ديني', 'islam']): main_color = RGBColor(39, 174, 96) # أخضر زمردي
-    elif any(w in topic_l for w in ['تقني', 'ذكاء', 'ai', 'tech']): main_color = RGBColor(41, 128, 185) # أزرق تقني
-    elif any(w in topic_l for w in ['جامعة', 'دراسة', 'uni']): main_color = RGBColor(44, 62, 80) # كحلي أكاديمي
+# --- 2. محرك التصميم والترتيب الذكي ---
+def apply_ultra_theme(slide, topic, item, lang_choice):
+    # تحديد اللون بناءً على الموضوع
+    t = topic.lower()
+    main_rgb = RGBColor(112, 111, 211) # افتراضي
+    if any(w in t for w in ['رمضان', 'ديني', 'سلام']): main_rgb = RGBColor(39, 174, 96)
+    elif any(w in t for w in ['تقني', 'ذكاء', 'ai']): main_rgb = RGBColor(41, 128, 185)
+    elif any(w in t for w in ['جامعة', 'دراسة']): main_rgb = RGBColor(44, 62, 80)
 
-    # أ) إضافة هيدر (Header) احترافي ومستطيل هندسي
-    rect = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, Inches(10), Inches(1.1))
+    # أ) إضافة أشكال هندسية (إطار العنوان)
+    rect = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, Inches(10), Inches(1))
     rect.fill.solid()
-    rect.fill.fore_color.rgb = main_color
+    rect.fill.fore_color.rgb = main_rgb
     rect.line.width = 0
 
-    # ب) إضافة خط جمالي جانبي كشكل هندسي (Accent)
-    accent = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, Inches(1.1), Inches(0.1), Inches(6.4))
-    accent.fill.solid()
-    accent.fill.fore_color.rgb = main_color
-    accent.line.width = 0
+    # ب) ترتيب العنوان
+    title_box = slide.shapes.add_textbox(0, 0, Inches(10), Inches(1))
+    p_title = title_box.text_frame.paragraphs[0]
+    p_title.text = str(item.get('title', ''))
+    p_title.font.size, p_title.font.bold = Pt(26), True
+    p_title.font.color.rgb = RGBColor(255, 255, 255)
+    p_title.alignment = PP_ALIGN.CENTER
 
-    # ج) تنسيق العنوان داخل الهيدر ومنع التداخل
-    title_box = slide.shapes.add_textbox(Inches(0.5), 0, Inches(9), Inches(1.1))
-    tf = title_box.text_frame
-    p = tf.paragraphs[0]
-    p.text = str(title_text)
-    p.font.size = Pt(28)
-    p.font.bold = True
-    p.font.color.rgb = RGBColor(255, 255, 255)
-    p.alignment = PP_ALIGN.CENTER if lang_choice == "مزدوج" else (PP_ALIGN.RIGHT if lang_choice == "العربية" else PP_ALIGN.LEFT)
-
-    # د) تنسيق المحتوى (Body) بمعايير عالمية ومنع تداخل اللغات
-    content_box = slide.shapes.add_textbox(Inches(0.6), Inches(1.4), Inches(8.8), Inches(5))
-    content_frame = content_box.text_frame
-    content_frame.word_wrap = True
-    p_body = content_frame.paragraphs[0]
-    p_body.text = str(body_text)
-    p_body.font.size = Pt(13)
-    p_body.font.name = "Arial"
+    # ج) ترتيب النصوص (العربي فوق الإنجليزي في المزدوج)
+    content_box = slide.shapes.add_textbox(Inches(0.5), Inches(1.2), Inches(9), Inches(5.5))
+    tf = content_box.text_frame
+    tf.word_wrap = True
     
-    # ضبط الاتجاه والمحاذاة تلقائياً
-    if "العربية" in lang_choice:
-        p_body.alignment = PP_ALIGN.RIGHT
-    elif "English" in lang_choice:
-        p_body.alignment = PP_ALIGN.LEFT
+    # معالجة النص المزدوج
+    full_text = ""
+    if lang_choice == "مزدوج":
+        full_text = f"{item.get('body_ar', '')}\n\n{item.get('body_en', '')}"
     else:
-        p_body.alignment = PP_ALIGN.JUSTIFY
+        full_text = item.get('body', '')
 
-# --- 3. الواجهة والتشغيل ---
+    p = tf.paragraphs[0]
+    p.text = full_text
+    p.font.size = Pt(13)
+    p.font.name = "Arial"
+    p.alignment = PP_ALIGN.RIGHT if lang_choice != "English" else PP_ALIGN.LEFT
+
+# --- 3. تشغيل النظام ---
 with st.container():
     st.markdown('<div class="centered-ui">', unsafe_allow_html=True)
-    topic = st.text_input("🎯 موضوع العرض", placeholder="مثلاً: مستقبل الذكاء الاصطناعي")
+    topic = st.text_input("🎯 موضوع العرض", placeholder="مثلاً: تأثير الصيام على الصحة")
     slides = st.select_slider("عدد الشرائح", options=[3, 5, 10, 15], value=5)
     lang = st.selectbox("🌐 اللغة", ["العربية", "English", "مزدوج"])
     
-    if st.button("🚀 إصدار العرض الاحترافي"):
+    if st.button("🚀 صنع العرض المطور"):
         api_key = st.secrets.get("OPENROUTER_API_KEY")
-        if not api_key:
-            st.error("يرجى ضبط Secrets: OPENROUTER_API_KEY")
+        if not api_key: st.error("ضبط مفتاح API أولاً!")
         else:
-            with st.spinner('🎨 جاري تطبيق الثيمات العالمية والأشكال الهندسية...'):
+            with st.spinner('🎨 جاري التنسيق وتكثيف المعلومات...'):
                 try:
-                    prompt = f"Create {slides} professional slides about '{topic}'. Deep academic details. Language: {lang}. Return ONLY JSON array: [{{'title': '...', 'body': '...'}}]"
+                    # طلب محتوى مكثف ومرتب
+                    fmt = "[{'title': '...', 'body_ar': 'نص عربي كثيف', 'body_en': 'Detailed English text'}]" if lang == "مزدوج" else "[{'title': '...', 'body': '...'}]"
+                    prompt = f"Create {slides} academic slides about '{topic}'. Deep details. Format: {fmt}"
                     res = requests.post("https://openrouter.ai/api/v1/chat/completions",
                                         headers={"Authorization": f"Bearer {api_key}"},
                                         json={"model": "google/gemini-2.0-flash-001", "messages": [{"role": "user", "content": prompt}]})
@@ -91,18 +85,16 @@ with st.container():
                     prs = Presentation()
                     for item in data:
                         slide = prs.slides.add_slide(prs.slide_layouts[6])
-                        apply_pro_theme(slide, topic, item['title'], item['body'], lang)
+                        apply_ultra_theme(slide, topic, item, lang)
                     
                     buf = io.BytesIO()
                     prs.save(buf)
-                    st.session_state['pro_file'] = buf.getvalue()
-                    st.session_state['pro_topic'] = topic
-                except Exception as e:
-                    st.error(f"خطأ: تأكد من المفتاح والرصيد. {e}")
+                    st.session_state['file'] = buf.getvalue()
+                    st.session_state['topic'] = topic
+                except Exception as e: st.error(f"حدث خطأ: {e}")
     st.markdown('</div>', unsafe_allow_html=True)
 
-if 'pro_file' in st.session_state:
+if 'file' in st.session_state:
     st.markdown('<div class="centered-ui">', unsafe_allow_html=True)
-    st.success("✅ جاهز للتحميل بمستوى عالمي وثيم مخصص!")
-    st.download_button("📥 تحميل الملف المطور", data=st.session_state['pro_file'], file_name=f"{st.session_state['pro_topic']}.pptx")
+    st.download_button("📥 تحميل الملف العالمي", data=st.session_state['file'], file_name=f"{st.session_state['topic']}.pptx")
     st.markdown('</div>', unsafe_allow_html=True)
